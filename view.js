@@ -419,7 +419,17 @@ function setupObserver(gsap) {
 
   console.log('observerView activated');
 }
-
+function waitForElement(selector, callback) {
+  const check = () => {
+    const el = document.querySelector(selector);
+    if (el) {
+      callback(el);
+    } else {
+      requestAnimationFrame(check);
+    }
+  };
+  check();
+}
 function setupContainerObserver(gsap) {
   if (containerObserverView) {
     containerObserverView.disconnect();
@@ -438,34 +448,64 @@ function setupContainerObserver(gsap) {
     subtree: true
   });
 }
+function waitForLoaderToDisappear(callback) {
+  const findAndWatch = () => {
+    const loader = document.querySelector('.hl-loader-container');
+    if (!loader) {
+      requestAnimationFrame(findAndWatch);
+      return;
+    }
+
+    const isHidden = () =>
+      window.getComputedStyle(loader).display === 'none';
+
+    if (isHidden()) {
+      return callback();
+    }
+
+    const observer = new MutationObserver(() => {
+      if (isHidden()) {
+        observer.disconnect();
+        callback();
+      }
+    });
+
+    observer.observe(loader, {
+      attributes: true,
+      attributeFilter: ['style'],
+    });
+  };
+
+  findAndWatch();
+}
 
 function init() {
-  loadGsap()
-    .then((gsap) => {
-      console.log('GSAP loaded, starting script with animations');
-      setupObserver(gsap);
-      setupContainerObserver(gsap);
-
-      document.body.addEventListener('click', (e) => {
-        const item = e.target.closest('.messages-list--item-v2');
-        if (item) {
+  waitForLoaderToDisappear(() => {
+    waitForElement('.messages-group-inner', () => {
+      loadGsap()
+        .then((gsap) => {
+          console.log('GSAP loaded, starting script with animations');
           setupObserver(gsap);
-        }
-      });
-
-    })
-    .catch((err) => {
-      console.warn('Failed to load GSAP, running without animations:', err);
-      setupObserver(null);
-      setupContainerObserver(null);
-
-      document.body.addEventListener('click', (e) => {
-        const item = e.target.closest('.messages-list--item-v2');
-        if (item) {
+          setupContainerObserver(gsap);
+          document.body.addEventListener('click', onClickHandler(gsap));
+        })
+        .catch((err) => {
+          console.warn('Failed to load GSAP, running without animations:', err);
           setupObserver(null);
-        }
-      });
+          setupContainerObserver(null);
+          document.body.addEventListener('click', onClickHandler(null));
+        });
     });
+  });
+}
+
+function onClickHandler(gsap) {
+  return (e) => {
+    const item = e.target.closest('.messages-list--item-v2');
+    if (item) {
+      setupObserver(gsap);
+    }
+  };
 }
 
 if (document.readyState === 'loading') {
