@@ -8,6 +8,7 @@
 let observerView = null;
 let containerView = null;
 let containerObserverView = null;
+let imageInterceptorSet = false;
 
 // Function to dynamically load GSAP
 function loadGsap() {
@@ -23,7 +24,53 @@ function loadGsap() {
     document.head.appendChild(script);
   });
 }
+function attachImageModalInterceptor(gsap) {
+  if (imageInterceptorSet) return;
+  imageInterceptorSet = true;
 
+  document.addEventListener(
+    'click',
+    (e) => {
+      const img = e.target.closest('img.sms-image-attachment, img.image-video');
+      if (!img) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const url = img.src;
+      const contentElement = document.createElement('div');
+      Object.assign(contentElement.style, {
+        maxWidth: '90vw',
+        maxHeight: '80vh',
+        borderRadius: '10px',
+        overflow: 'hidden',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+      });
+
+      const previewElement = document.createElement('img');
+      previewElement.src = url;
+      Object.assign(previewElement.style, {
+        maxWidth: '100%',
+        maxHeight: '80vh',
+        borderRadius: '10px',
+        objectFit: 'contain',
+      });
+      contentElement.appendChild(previewElement);
+
+      if (supportsViewTransitions()) {
+        document.startViewTransition(() => {
+          const modal = createModal(contentElement, 'Image', gsap);
+          document.body.appendChild(modal);
+        });
+      } else {
+        const modal = createModal(contentElement, 'Image', gsap);
+        document.body.appendChild(modal);
+      }
+    },
+    true
+  );
+}
 function createModal(contentElement, title = '', gsap) {
   const modalBg = document.createElement('div');
   Object.assign(modalBg.style, {
@@ -487,12 +534,14 @@ function init() {
           console.log('GSAP loaded, starting script with animations');
           setupObserver(gsap);
           setupContainerObserver(gsap);
+          attachImageModalInterceptor(gsap);
           document.body.addEventListener('click', onClickHandler(gsap));
         })
         .catch((err) => {
           console.warn('Failed to load GSAP, running without animations:', err);
           setupObserver(null);
           setupContainerObserver(null);
+          attachImageModalInterceptor(null);
           document.body.addEventListener('click', onClickHandler(null));
         });
     });
